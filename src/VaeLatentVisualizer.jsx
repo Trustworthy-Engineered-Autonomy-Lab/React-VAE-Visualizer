@@ -136,8 +136,6 @@ function VaeLatentVisualizer() {
 
   return (
     <div style={{ justifyContent: "center", padding: 16, fontFamily: "sans-serif" }}>
-      <h2>Latent</h2>
-
       {loading && <p>Loading ONNX model…</p>}
       {error && (
         <p style={{ color: "red", whiteSpace: "pre-wrap" }}>

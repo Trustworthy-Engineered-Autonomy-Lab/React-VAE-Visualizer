@@ -521,8 +521,7 @@ export default function PIWMVisualizer() {
     loading || !vaeEnc || !vaeDec || !lstm || !piwmEnc || !piwmDec;
 
   return (
-    <div style={{ padding: 16, fontFamily: "sans-serif" }}>
-      <h2>PIWM Visualizer</h2>
+    <div style={{ justifyContent: 'center', padding: 16, fontFamily: "sans-serif" }}>
 
       {loading && <p>Loading ONNX models…</p>}
       {error && (

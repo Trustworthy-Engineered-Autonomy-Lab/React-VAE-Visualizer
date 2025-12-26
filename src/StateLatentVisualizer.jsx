@@ -111,8 +111,6 @@ function StateLatentVisualizer() {
 
   return (
     <div style={{ padding: 16, fontFamily: "sans-serif" }}>
-      <h2>Interpretable</h2>
-
       {loading && <p>Loading state_to_image.onnx…</p>}
       {error && (
         <p style={{ color: "red", whiteSpace: "pre-wrap" }}>

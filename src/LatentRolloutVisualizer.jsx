@@ -383,7 +383,6 @@ export default function LatentRolloutVisualizer() {
 
     <div>
       <div>
-        <h2>LSTM</h2>
 
         {loading && <p>Loading ONNX models…</p>}
         {error && <p style={{ color: "red", whiteSpace: "pre-wrap" }}>Error: {error}</p>}
