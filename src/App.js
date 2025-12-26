@@ -6,6 +6,7 @@ import StateLatentVisualizer from "./StateLatentVisualizer";
 import LatentRolloutVisualizer from "./LatentRolloutVisualizer"; // ← new
 import SemiInterpretableVisualizer from "./SemiInterpretableVisualizer";
 import PIWMVisualizer from "./PIWMVisualizer";
+import Guide from "./Guide";
 
 function App() {
   return (
@@ -20,6 +21,27 @@ function App() {
           marginBottom: 16,
         }}
       >
+
+        <NavLink
+          to="/guide"
+          style={({ isActive }) => ({
+            textDecoration: "none",
+            fontWeight: isActive ? "700" : "500",
+            color: isActive ? "#2563eb" : "#444",
+          })}
+        >
+          Guide
+        </NavLink>
+        <NavLink
+          to="/piwm"
+          style={({ isActive }) => ({
+            textDecoration: "none",
+            fontWeight: isActive ? "700" : "500",
+            color: isActive ? "#2563eb" : "#444",
+          })}
+        >
+          PIWM
+        </NavLink>
         <NavLink
           to="/latent"
           style={({ isActive }) => ({
@@ -64,20 +86,12 @@ function App() {
           LSTM
         </NavLink>
 
-        <NavLink
-          to="/piwm"
-          style={({ isActive }) => ({
-            textDecoration: "none",
-            fontWeight: isActive ? "700" : "500",
-            color: isActive ? "#2563eb" : "#444",
-          })}
-        >
-          PIWM
-        </NavLink>
+
       </nav>
 
       <Routes>
-        <Route path="/" element={<Navigate to="/latent" replace />} />
+        <Route path="/" element={<Navigate to="/guide" replace />} />
+        <Route path="/guide" element={<Guide />} />
         <Route path="/latent" element={<VaeLatentVisualizer />} />
         <Route path="/state" element={<StateLatentVisualizer />} />
         <Route path="/semi" element={<SemiInterpretableVisualizer />} />
