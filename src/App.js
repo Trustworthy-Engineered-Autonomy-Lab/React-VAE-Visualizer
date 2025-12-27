@@ -8,7 +8,7 @@ import LatentRolloutVisualizer from "./LatentRolloutVisualizer";
 import SemiInterpretableVisualizer from "./SemiInterpretableVisualizer";
 import PIWMVisualizer from "./PIWMVisualizer";
 import Guide from "./Guide";
-
+import Home from "./Home";
 const S = {
   shell: {
     fontFamily:
@@ -113,6 +113,7 @@ function TopNav() {
   // label + accent dot per route (optional but looks “research dashboard”)
   const items = useMemo(
     () => [
+      { to: "/home ", label: "Home", dot: "#22c55e" },
       { to: "/guide", label: "Guide", dot: "#22c55e" },
       { to: "/piwm", label: "PIWM", dot: "#a855f7" },
       { to: "/latent", label: "Latent", dot: "#3b82f6" },
@@ -127,6 +128,7 @@ function TopNav() {
   const subtitle = useMemo(() => {
     const path = location.pathname;
     if (path.startsWith("/piwm")) return "PIWM Model";
+    if (path.startsWith("/home")) return "Home";
     if (path.startsWith("/latent")) return "VAE encoder/decoder Latent Space";
     if (path.startsWith("/rollout")) return "Latent Rollouts";
     if (path.startsWith("/state")) return "Interpretable State Mapping";
@@ -173,8 +175,9 @@ function App() {
 
       <div style={S.contentWrap}>
         <Routes>
-          <Route path="/" element={<Navigate to="/guide" replace />} />
+          <Route path="/" element={<Navigate to="/home" replace />} />
           <Route path="/guide" element={<Guide />} />
+          <Route path="/home" element={<Home />} />
           <Route path="/latent" element={<VaeLatentVisualizer />} />
           <Route path="/state" element={<StateLatentVisualizer />} />
           <Route path="/semi" element={<SemiInterpretableVisualizer />} />
