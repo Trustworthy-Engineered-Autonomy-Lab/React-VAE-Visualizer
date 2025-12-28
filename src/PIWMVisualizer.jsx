@@ -1,4 +1,3 @@
-// src/visualizers/piwm/PIWMVisualizer.jsx
 import React, { useEffect, useMemo, useRef, useState } from "react";
 
 import { useOrtRuntime } from "./hooks/useOrtRuntime";
@@ -11,6 +10,14 @@ import { usePiwmControls } from "./hooks/usePiwmControls";
 import { IMG_H, IMG_W, blitUpscale } from "./utils/canvas";
 import { renderObservationTo96 } from "./utils/render.js";
 
+import { useUiTheme } from "./components/theme";
+import { Card, CardTitleRow } from "./components/Card";
+import { Button } from "./components/Button";
+import { Pill, Dot } from "./components/Pill";
+import { CanvasFrame } from "./components/CanvasFrame";
+import { PageHeader } from "./components/PageHeader";
+import { SliderGrid } from "./components/SliderGrid";
+
 const SCALE = 4;
 
 const LATENT_DIM = 16;
@@ -22,12 +29,17 @@ const HIDDEN_DIM = 128;
 const RENDER_W = 600;
 const RENDER_H = 400;
 
+
+
 export default function PIWMVisualizer() {
   // ---- ORT runtime config ----
   useOrtRuntime();
 
   // ---- models ----
   const { vaeEnc, vaeDec, lstm, piwmEnc, piwmDec, loading, error, setError } = usePiwmModels();
+
+  // ---- theme ----
+  const styles = useUiTheme({ imgW: IMG_W, imgH: IMG_H, scale: SCALE });
 
   // ---- state: Ground truth full state ----
   const [gtState, setGtState] = useState({
@@ -137,427 +149,187 @@ export default function PIWMVisualizer() {
 
   const disabled = loading || !vaeEnc || !vaeDec || !lstm || !piwmEnc || !piwmDec;
 
-  // ---- styles (same look as your current component) ----
-  const styles = useMemo(() => {
-    const font =
-      'ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, "Apple Color Emoji","Segoe UI Emoji"';
+  const subtitle = useMemo(
+    () => (
+      <>
+        Side-by-side comparison of <span style={styles.kbd}>Ground Truth</span>,{" "}
+        <span style={styles.kbd}>Latent LSTM</span>, and <span style={styles.kbd}>PIWM state↔image</span>. Use{" "}
+        <b>Sync</b> to align all representations to the same GT observation.
+      </>
+    ),
+    [styles.kbd]
+  );
 
-    const card = {
-      borderRadius: 16,
-      border: "1px solid rgba(15,23,42,0.08)",
-      background: "rgba(255,255,255,0.86)",
-      boxShadow: "0 12px 24px rgba(15,23,42,0.05)",
-      padding: 16,
-    };
-
-    const titleRow = { display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10 };
-
-    const pill = (bg, border) => ({
-      display: "inline-flex",
-      alignItems: "center",
-      gap: 8,
-      padding: "7px 10px",
-      borderRadius: 999,
-      border: `1px solid ${border}`,
-      background: bg,
-      fontSize: 12.5,
-      color: "#0f172a",
-      whiteSpace: "nowrap",
-    });
-
-    const dot = (c) => ({
-      width: 9,
-      height: 9,
-      borderRadius: 999,
-      background: c,
-      boxShadow: "0 0 0 3px rgba(15,23,42,0.05)",
-    });
-
-    const btn = {
-      padding: "9px 12px",
-      fontSize: 13.5,
-      borderRadius: 12,
-      border: "1px solid rgba(15,23,42,0.14)",
-      background: "rgba(255,255,255,0.78)",
-      color: "#0f172a",
-      cursor: "pointer",
-      boxShadow: "0 10px 18px rgba(15,23,42,0.04)",
-    };
-
-    const btnPrimary = {
-      ...btn,
-      border: "1px solid rgba(37,99,235,0.28)",
-      background: "linear-gradient(180deg, rgba(59,130,246,0.16), rgba(59,130,246,0.07))",
-    };
-
-    const btnDanger = {
-      ...btn,
-      border: "1px solid rgba(244,63,94,0.28)",
-      background: "linear-gradient(180deg, rgba(244,63,94,0.12), rgba(244,63,94,0.05))",
-    };
-
-    const btnDisabled = {
-      opacity: 0.55,
-      cursor: "not-allowed",
-    };
-
-    const kbd = {
-      fontFamily:
-        'ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace',
-      fontSize: 12.5,
-      padding: "2px 6px",
-      borderRadius: 8,
-      border: "1px solid rgba(15,23,42,0.18)",
-      background: "rgba(255,255,255,0.78)",
-      color: "#0f172a",
-      whiteSpace: "nowrap",
-    };
-
-    const canvasFrame = {
-      width: `${IMG_W * SCALE}px`,
-      height: `${IMG_H * SCALE}px`,
-      imageRendering: "pixelated",
-      borderRadius: 14,
-      border: "1px solid rgba(15,23,42,0.14)",
-      background:
-        "radial-gradient(450px 220px at 30% 20%, rgba(59,130,246,0.10), rgba(15,23,42,0.02))",
-      boxShadow: "0 12px 22px rgba(15,23,42,0.06)",
-    };
-
-    const smallText = { fontSize: 12.5, color: "#64748b", lineHeight: 1.55, marginBottom: 10 };
-
-    const sliderWrap = {
-      display: "grid",
-      gridTemplateColumns: "1fr 1fr",
-      gap: 14,
-      marginTop: 8,
-    };
-
-    const sliderLabel = {
-      display: "flex",
-      alignItems: "baseline",
-      justifyContent: "space-between",
-      gap: 10,
-      fontFamily:
-        'ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace',
-      fontSize: 12.5,
-      color: "#0f172a",
-      marginBottom: 6,
-    };
-
-    const slider = {
-      width: 240,
-      accentColor: "#2563eb",
-    };
-
-    const page = {
-      fontFamily: font,
-      color: "#0f172a",
-      padding: 18,
-      maxWidth: "95%",
-      margin: "0 auto",
-    };
-
-    const header = {
-      marginBottom: 14,
-      borderRadius: 18,
-      border: "1px solid rgba(15,23,42,0.08)",
-      background: "linear-gradient(135deg, rgba(59,130,246,0.10), rgba(236,72,153,0.08))",
-      padding: 16,
-      boxShadow: "0 12px 30px rgba(15,23,42,0.06)",
-    };
-
-    const h1 = { margin: 0, fontSize: 22, letterSpacing: -0.35 };
-    const lead = { margin: "6px 0 0 0", color: "#334155", fontSize: 13.5, lineHeight: 1.6 };
-
-    const grid = {
-      display: "grid",
-      gridTemplateColumns: "1fr 1fr 1fr",
-      gap: 16,
-      alignItems: "start",
-    };
-
-    const callout = {
-      marginTop: 10,
-      padding: 12,
-      borderRadius: 14,
-      border: "1px solid rgba(2,132,199,0.22)",
-      background: "linear-gradient(180deg, rgba(56,189,248,0.10), rgba(56,189,248,0.04))",
-      fontSize: 13,
-      color: "#334155",
-      lineHeight: 1.55,
-    };
-
-    const err = {
-      borderRadius: 16,
-      border: "1px solid rgba(244,63,94,0.25)",
-      background: "linear-gradient(180deg, rgba(244,63,94,0.10), rgba(244,63,94,0.03))",
-      padding: 12,
-      color: "#991b1b",
-      whiteSpace: "pre-wrap",
-      fontSize: 13,
-      marginBottom: 12,
-    };
-
-    return {
-      page,
-      header,
-      h1,
-      lead,
-      grid,
-      card,
-      titleRow,
-      pill,
-      dot,
-      btn,
-      btnPrimary,
-      btnDanger,
-      btnDisabled,
-      kbd,
-      canvasFrame,
-      smallText,
-      sliderWrap,
-      sliderLabel,
-      slider,
-      callout,
-      err,
-    };
-  }, []);
+  const rightBadges = useMemo(
+    () => (
+      <>
+        <Pill styles={styles} bg="rgba(34,197,94,0.10)" border="rgba(34,197,94,0.28)" dotColor="#22c55e">
+          Ground Truth
+        </Pill>
+        <Pill styles={styles} bg="rgba(14,165,233,0.10)" border="rgba(14,165,233,0.26)" dotColor="#0ea5e9">
+          LSTM Rollout
+        </Pill>
+        <Pill styles={styles} bg="rgba(168,85,247,0.10)" border="rgba(168,85,247,0.24)" dotColor="#a855f7">
+          PIWM
+        </Pill>
+      </>
+    ),
+    [styles]
+  );
 
   return (
     <div style={styles.page}>
-      <div style={styles.header}>
-        <div
-          style={{
-            display: "flex",
-            alignItems: "baseline",
-            justifyContent: "space-between",
-            gap: 12,
-            flexWrap: "wrap",
-          }}
-        >
-          <div>
-            <h1 style={styles.h1}>PIWM Visualizer</h1>
-            <p style={styles.lead}>
-              Side-by-side comparison of <span style={styles.kbd}>Ground Truth</span>,{" "}
-              <span style={styles.kbd}>Latent LSTM</span>, and <span style={styles.kbd}>PIWM state↔image</span>.
-              Use <b>Sync</b> to align all representations to the same GT observation.
-            </p>
-          </div>
-
-          <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-            <span style={styles.pill("rgba(34,197,94,0.10)", "rgba(34,197,94,0.28)")}>
-              <span style={styles.dot("#22c55e")} /> Ground Truth
-            </span>
-            <span style={styles.pill("rgba(14,165,233,0.10)", "rgba(14,165,233,0.26)")}>
-              <span style={styles.dot("#0ea5e9")} /> LSTM Rollout
-            </span>
-            <span style={styles.pill("rgba(168,85,247,0.10)", "rgba(168,85,247,0.24)")}>
-              <span style={styles.dot("#a855f7")} /> PIWM
-            </span>
-          </div>
-        </div>
-
-        <div style={styles.callout}>
-          <b>Recommended flow:</b> Set a clean GT state → <b>Sync GT → VAE + PIWM</b> → apply actions (Left/Right) →
-          observe drift. If anything looks off, reset + sync again.
-        </div>
-      </div>
+      <PageHeader
+        styles={styles}
+        title="PIWM Visualizer"
+        subtitle={subtitle}
+        right={rightBadges}
+        callout={
+          <>
+            <b>Recommended flow:</b> Set a clean GT state → <b>Sync GT → VAE + PIWM</b> → apply actions (Left/Right) →
+            observe drift. If anything looks off, reset + sync again.
+          </>
+        }
+      />
 
       {loading && (
-        <div style={{ ...styles.card, marginBottom: 12 }}>
+        <Card style={{ ...styles.card, marginBottom: 12 }}>
           <div style={{ fontWeight: 800, marginBottom: 6 }}>Loading ONNX models…</div>
           <div style={styles.smallText}>
             If this takes unusually long, confirm the model paths are correct and that the browser is not blocking WASM
             assets.
           </div>
-        </div>
+        </Card>
       )}
 
       {error && <div style={styles.err}>Error: {error}</div>}
 
       <div style={styles.grid}>
         {/* ===================== GT ===================== */}
-        <section style={styles.card}>
-          <div style={styles.titleRow}>
+        <Card style={styles.card}>
+          <CardTitleRow style={styles.titleRow}>
             <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-              <div style={styles.dot("#22c55e")} aria-hidden />
+              <Dot styles={styles} color="#22c55e" />
               <div>
                 <div style={{ fontWeight: 850, letterSpacing: -0.2 }}>Ground Truth</div>
                 <div style={styles.smallText}>Physics transition + deterministic renderer</div>
               </div>
             </div>
 
-            <button onClick={resetGT} style={{ ...styles.btnDanger }} type="button" aria-label="Reset ground truth">
+            <Button variant="danger" styles={styles} onClick={resetGT} aria-label="Reset ground truth">
               Reset
-            </button>
-          </div>
+            </Button>
+          </CardTitleRow>
 
           {/* hidden render canvases */}
           <canvas ref={gtRenderCanvasRef} width={RENDER_W} height={RENDER_H} style={{ display: "none" }} />
           <canvas ref={gtSmallCanvasRef} width={IMG_W} height={IMG_H} style={{ display: "none" }} />
 
-          <canvas ref={gtBigCanvasRef} width={IMG_W * SCALE} height={IMG_H * SCALE} style={styles.canvasFrame} />
-
-          <div style={styles.sliderWrap}>
-            <div>
-              <div style={styles.sliderLabel}>
-                <span>Position</span>
-                <span>{gtState.x.toFixed(2)}</span>
-              </div>
-              <input
-                type="range"
-                min={-2.4}
-                max={2.4}
-                step={0.01}
-                value={gtState.x}
-                onChange={(e) => setGtState((prev) => ({ ...prev, x: Number(e.target.value) }))}
-                style={styles.slider}
-              />
-            </div>
-
-            <div>
-              <div style={styles.sliderLabel}>
-                <span>Angle</span>
-                <span>{gtState.theta.toFixed(2)}</span>
-              </div>
-              <input
-                type="range"
-                min={-3.14159}
-                max={3.14159}
-                step={0.01}
-                value={gtState.theta}
-                onChange={(e) => setGtState((prev) => ({ ...prev, theta: Number(e.target.value) }))}
-                style={styles.slider}
-              />
-            </div>
-          </div>
-
+          <CanvasFrame
+            canvasRef={gtBigCanvasRef}
+            width={IMG_W * SCALE}
+            height={IMG_H * SCALE}
+            style={styles.canvasFrame}
+          />
           <div style={{ display: "flex", gap: 10, marginTop: 12, flexWrap: "wrap" }}>
-            <button
-              onClick={syncGT}
-              disabled={disabled}
-              style={{ ...styles.btnPrimary, ...(disabled ? styles.btnDisabled : {}) }}
-              type="button"
-            >
+            <Button variant="primary" styles={styles} onClick={syncGT} disabled={disabled}>
               Sync GT → VAE + PIWM
-            </button>
+            </Button>
 
             <div style={styles.smallText}>
               State: x={gtState.x.toFixed(2)}, xDot={gtState.xDot.toFixed(2)}, θ={gtState.theta.toFixed(2)}, θDot=
               {gtState.thetaDot.toFixed(2)}
             </div>
           </div>
-        </section>
+
+          <SliderGrid
+            styles={styles}
+            title={null}
+            description={null}
+            columns={2}
+            maxHeight={220} // small since it's only 2 sliders; optional
+            values={[gtState.x, gtState.theta]}
+            labelForIndex={(i) => (i === 0 ? "Position" : "Angle")}
+            formatValue={(v) => Number(v).toFixed(2)}
+            rangeForIndex={(i) =>
+              i === 0
+                ? { min: -2.4, max: 2.4, step: 0.01, width: 240 }
+                : { min: -3.14159, max: 3.14159, step: 0.01, width: 240 }
+            }
+            onChangeIndex={(i, val) => {
+              if (i === 0) setGtState((prev) => ({ ...prev, x: val }));
+              else setGtState((prev) => ({ ...prev, theta: val }));
+            }}
+          />
+
+
+        </Card>
 
         {/* ===================== LSTM ===================== */}
-        <section style={styles.card}>
-          <div style={styles.titleRow}>
+        <Card style={styles.card}>
+          <CardTitleRow style={styles.titleRow}>
             <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-              <div style={styles.dot("#0ea5e9")} aria-hidden />
+              <Dot styles={styles} color="#0ea5e9" />
               <div>
                 <div style={{ fontWeight: 850, letterSpacing: -0.2 }}>LSTM Latent Rollout</div>
                 <div style={styles.smallText}>Latent transition (z, a, h/c) → z′</div>
               </div>
             </div>
 
-            <button onClick={resetLatent} style={styles.btn} type="button">
+            <Button variant="danger" styles={styles} onClick={resetLatent}>
               Reset latent & hidden
-            </button>
-          </div>
+            </Button>
+          </CardTitleRow>
 
           <canvas ref={latentSmallCanvasRef} width={IMG_W} height={IMG_H} style={{ display: "none" }} />
-          <canvas
-            ref={latentBigCanvasRef}
+          <CanvasFrame
+            canvasRef={latentBigCanvasRef}
             width={IMG_W * SCALE}
             height={IMG_H * SCALE}
             style={styles.canvasFrame}
           />
 
           <div style={{ display: "flex", gap: 10, marginTop: 12, flexWrap: "wrap" }}>
-            <button
-              onClick={() => stepWithAction(0)}
-              disabled={disabled}
-              style={{ ...styles.btnPrimary, ...(disabled ? styles.btnDisabled : {}) }}
-              type="button"
-            >
+            <Button variant="primary" styles={styles} onClick={() => stepWithAction(0)} disabled={disabled}>
               Action: Left
-            </button>
-            <button
-              onClick={() => stepWithAction(1)}
-              disabled={disabled}
-              style={{ ...styles.btnPrimary, ...(disabled ? styles.btnDisabled : {}) }}
-              type="button"
-            >
+            </Button>
+            <Button variant="primary" styles={styles} onClick={() => stepWithAction(1)} disabled={disabled}>
               Action: Right
-            </button>
+            </Button>
           </div>
 
-          <div style={{ marginTop: 12, borderTop: "1px solid rgba(15,23,42,0.08)", paddingTop: 12 }}>
-            <div style={{ fontWeight: 800, fontSize: 13.5, color: "#0f172a" }}>Latent controls</div>
-            <div style={styles.smallText}>
-              Edit <span style={styles.kbd}>z[i]</span> manually to probe what directions the decoder uses.
-            </div>
-
-            <div
-              style={{
-                display: "grid",
-                gridTemplateColumns: "1fr 1fr",
-                columnGap: 16,
-                rowGap: 12,
-                maxHeight: 420,
-                overflowY: "auto",
-                paddingRight: 6,
-                marginTop: 10,
-              }}
-            >
-              {latent.map((v, i) => (
-                <div key={i}>
-                  <div style={styles.sliderLabel}>
-                    <span>z[{i}]</span>
-                    <span>{v.toFixed(2)}</span>
-                  </div>
-                  <input
-                    type="range"
-                    min={-3}
-                    max={3}
-                    step={0.05}
-                    value={v}
-                    onChange={(e) => {
-                      const val = Number(e.target.value);
-                      setLatent((prev) => {
-                        const next = [...prev];
-                        next[i] = val;
-                        return next;
-                      });
-                    }}
-                    style={styles.slider}
-                  />
-                </div>
-              ))}
-            </div>
-          </div>
-        </section>
+          <SliderGrid
+            styles={styles}
+            latent={latent}
+            onChangeLatent={(i, val) => {
+              setLatent((prev) => {
+                const next = [...prev];
+                next[i] = val;
+                return next;
+              });
+            }}
+          />
+        </Card>
 
         {/* ===================== PIWM ===================== */}
-        <section style={styles.card}>
-          <div style={styles.titleRow}>
+        <Card style={styles.card}>
+          <CardTitleRow style={styles.titleRow}>
             <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-              <div style={styles.dot("#a855f7")} aria-hidden />
+              <Dot styles={styles} color="#a855f7" />
               <div>
                 <div style={{ fontWeight: 850, letterSpacing: -0.2 }}>PIWM (state ↔ image)</div>
                 <div style={styles.smallText}>Encoder: image → (x, θ) • Decoder: (x, θ) → image</div>
               </div>
             </div>
 
-            <button onClick={resetPiwm} style={styles.btnDanger} type="button">
+            <Button variant="danger" styles={styles} onClick={resetPiwm}>
               Reset
-            </button>
-          </div>
+            </Button>
+          </CardTitleRow>
 
           <canvas ref={piwmSmallCanvasRef} width={IMG_W} height={IMG_H} style={{ display: "none" }} />
-          <canvas
-            ref={piwmBigCanvasRef}
+          <CanvasFrame
+            canvasRef={piwmBigCanvasRef}
             width={IMG_W * SCALE}
             height={IMG_H * SCALE}
             style={styles.canvasFrame}
@@ -580,7 +352,7 @@ export default function PIWMVisualizer() {
               </div>
             </div>
           </div>
-        </section>
+        </Card>
       </div>
     </div>
   );

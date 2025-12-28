@@ -1,6 +1,14 @@
 // src/LatentRolloutVisualizer.jsx
-import React, { useEffect, useRef, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import * as ort from "onnxruntime-web";
+
+import { useUiTheme } from "./components/theme";
+import { Card, CardTitleRow } from "./components/Card";
+import { Button } from "./components/Button";
+import { Dot } from "./components/Pill";
+import { CanvasFrame } from "./components/CanvasFrame";
+import { PageHeader } from "./components/PageHeader";
+import { SliderGrid } from "./components/SliderGrid";
 
 const IMG_H = 96;
 const IMG_W = 96;
@@ -81,22 +89,15 @@ function rot(x, y, angle) {
 }
 
 // ---------- GT observation renderer (match python geometry) ----------
-function renderObservationTo96({
-  position,
-  angle,
-  renderCanvas,
-  smallCanvas96,
-}) {
+function renderObservationTo96({ position, angle, renderCanvas, smallCanvas96 }) {
   const rctx = renderCanvas.getContext("2d");
   const sctx = smallCanvas96.getContext("2d");
 
-  // ---- python: surf.fill((255,255,255)) ----
   rctx.setTransform(1, 0, 0, 1, 0, 0);
   rctx.clearRect(0, 0, RENDER_W, RENDER_H);
   rctx.fillStyle = "#ffffff";
   rctx.fillRect(0, 0, RENDER_W, RENDER_H);
 
-  // python parameters
   const worldWidth = X_THRESHOLD * 2;
   const scale = RENDER_W / worldWidth;
   const polewidth = 10.0;
@@ -104,7 +105,6 @@ function renderObservationTo96({
   const cartwidth = 50.0;
   const cartheight = 30.0;
 
-  // cart coords & placement
   const l = -cartwidth / 2;
   const r = cartwidth / 2;
   const t = cartheight / 2;
@@ -114,15 +114,10 @@ function renderObservationTo96({
   const cartx = position * scale + RENDER_W / 2.0;
   const carty = RENDER_H / 2.0;
 
-  // ---- python flips vertically AFTER drawing:
-  // surf = pygame.transform.flip(surf, False, True)
-  // We'll simulate that by drawing everything in a flipped-y coordinate system
-  // so final pixels match.
   rctx.save();
   rctx.translate(0, RENDER_H);
   rctx.scale(1, -1);
 
-  // ---- cart polygon (black) ----
   const cartPts = [
     { x: l + cartx, y: b + carty },
     { x: l + cartx, y: t + carty },
@@ -131,8 +126,6 @@ function renderObservationTo96({
   ];
   fillPolygon(rctx, cartPts, "#000000", "#000000");
 
-  // ---- pole polygon (brown) rotated around (cartx, carty+axleoffset)
-  // python uses coords: (-polew/2, -polew/2), (-polew/2, polelen-polew/2), ...
   const pl = -polewidth / 2;
   const pr = polewidth / 2;
   const pt = polelen - polewidth / 2;
@@ -148,7 +141,6 @@ function renderObservationTo96({
     { x: pr, y: pb },
   ];
 
-  // python: rotate_rad(-angle)
   const polePts = localPole.map((p) => {
     const q = rot(p.x, p.y, -angle);
     return { x: q.x + anchorX, y: q.y + anchorY };
@@ -156,7 +148,6 @@ function renderObservationTo96({
 
   fillPolygon(rctx, polePts, "rgb(202,152,101)", "rgb(202,152,101)");
 
-  // ---- axle (blue circle) ----
   rctx.beginPath();
   rctx.arc(anchorX, anchorY, polewidth / 2, 0, Math.PI * 2);
   rctx.fillStyle = "rgb(129,132,203)";
@@ -164,7 +155,6 @@ function renderObservationTo96({
   rctx.strokeStyle = "rgb(129,132,203)";
   rctx.stroke();
 
-  // ---- ground line: gfxdraw.hline(surf, 0, render_width, int(carty), (0,0,0))
   rctx.beginPath();
   rctx.moveTo(0, carty);
   rctx.lineTo(RENDER_W, carty);
@@ -174,7 +164,6 @@ function renderObservationTo96({
 
   rctx.restore();
 
-  // ---- resize to 96x96 (cv2.INTER_AREA-ish). drawImage does decent area downsample.
   sctx.imageSmoothingEnabled = true;
   sctx.clearRect(0, 0, IMG_W, IMG_H);
   sctx.drawImage(renderCanvas, 0, 0, RENDER_W, RENDER_H, 0, 0, IMG_W, IMG_H);
@@ -184,17 +173,7 @@ function blitUpscale(smallCanvas, bigCanvas) {
   const bctx = bigCanvas.getContext("2d");
   bctx.imageSmoothingEnabled = false;
   bctx.clearRect(0, 0, bigCanvas.width, bigCanvas.height);
-  bctx.drawImage(
-    smallCanvas,
-    0,
-    0,
-    smallCanvas.width,
-    smallCanvas.height,
-    0,
-    0,
-    bigCanvas.width,
-    bigCanvas.height
-  );
+  bctx.drawImage(smallCanvas, 0, 0, smallCanvas.width, smallCanvas.height, 0, 0, bigCanvas.width, bigCanvas.height);
 }
 
 function drawCHWFloatToCanvases(chwData, smallCanvas, bigCanvas) {
@@ -232,7 +211,12 @@ function canvasToCHWFloat(smallCanvas) {
   return chw;
 }
 
+
+
 export default function LatentRolloutVisualizer() {
+  // ---- theme ----
+  const styles = useUiTheme({ imgW: IMG_W, imgH: IMG_H, scale: SCALE });
+
   // ONNX sessions
   const [encoderSession, setEncoderSession] = useState(null);
   const [decoderSession, setDecoderSession] = useState(null);
@@ -251,8 +235,8 @@ export default function LatentRolloutVisualizer() {
 
   // refs
   const gtRenderCanvasRef = useRef(null); // 600x400 offscreen
-  const gtSmallCanvasRef = useRef(null);  // 96x96 offscreen
-  const gtBigCanvasRef = useRef(null);    // visible 384x384
+  const gtSmallCanvasRef = useRef(null); // 96x96 offscreen
+  const gtBigCanvasRef = useRef(null); // visible 384x384
 
   const latentSmallCanvasRef = useRef(null);
   const latentBigCanvasRef = useRef(null);
@@ -306,11 +290,8 @@ export default function LatentRolloutVisualizer() {
 
         const out = await decoderSession.run({ z: zTensor });
         const xRecon = out["x_recon"];
-        drawCHWFloatToCanvases(
-          xRecon.data,
-          latentSmallCanvasRef.current,
-          latentBigCanvasRef.current
-        );
+
+        drawCHWFloatToCanvases(xRecon.data, latentSmallCanvasRef.current, latentBigCanvasRef.current);
       } catch (e) {
         console.error(e);
         setError(String(e));
@@ -328,6 +309,7 @@ export default function LatentRolloutVisualizer() {
 
       const out = await encoderSession.run({ x: xTensor });
       const mu = out["mu"];
+
       setLatent(Array.from(mu.data));
       setHData(null);
       setCData(null);
@@ -377,185 +359,159 @@ export default function LatentRolloutVisualizer() {
     }
   };
 
+  const resetGT = () => setGtState({ x: 0, xDot: 0, theta: 0, thetaDot: 0 });
+  const resetLatent = () => {
+    setLatent(Array(LATENT_DIM).fill(0));
+    setHData(null);
+    setCData(null);
+  };
+
   const disabled = loading || !encoderSession || !decoderSession || !lstmSession;
 
+  const subtitle = useMemo(
+    () => (
+      <>
+        Compare <span style={styles.kbd}>Ground Truth</span> observation rendering against <span style={styles.kbd}>LSTM</span>{" "}
+        latent rollout decoded back to pixels. Use <b>Sync</b> to initialize latent from the GT image.
+      </>
+    ),
+    [styles.kbd]
+  );
+
   return (
+    <div style={styles.page}>
+      <PageHeader
+        styles={styles}
+        title="Latent Rollout Visualizer"
+        subtitle={subtitle}
+        callout={
+          <>
+            <b>Flow:</b> set GT sliders → <b>Sync GT image → latent</b> → step actions → compare decoded drift vs GT.
+          </>
+        }
+      />
 
-    <div>
-      <div>
+      {loading && (
+        <Card style={{ ...styles.card, marginBottom: 12 }}>
+          <div style={{ fontWeight: 800, marginBottom: 6 }}>Loading ONNX models…</div>
+          <div style={styles.smallText}>If loading hangs, double-check model paths and WASM asset delivery.</div>
+        </Card>
+      )}
 
-        {loading && <p>Loading ONNX models…</p>}
-        {error && <p style={{ color: "red", whiteSpace: "pre-wrap" }}>Error: {error}</p>}
-      </div>
-      <div style={{ padding: 16, fontFamily: "sans-serif", display: "flex", flexDirection: "row" }}>
+      {error && <div style={styles.err}>Error: {error}</div>}
 
-
-        <div style={{ display: "flex", gap: 32, alignItems: "flex-start", flexDirection: "column" }}>
-          {/* LEFT: Ground truth */}
-          <div>
-            <h3>Ground Truth</h3>
-            {/* offscreen render canvases */}
-            <canvas ref={gtRenderCanvasRef} width={RENDER_W} height={RENDER_H} style={{ display: "none" }} />
-            <canvas ref={gtSmallCanvasRef} width={IMG_W} height={IMG_H} style={{ display: "none" }} />
-
-            {/* visible upscaled */}
-            <p style={{ color: "#666", marginTop: 12 }}>Observation (96×96 upscaled)</p>
-            <canvas
-              ref={gtBigCanvasRef}
-              width={IMG_W * SCALE}
-              height={IMG_H * SCALE}
-              style={{
-                width: `${IMG_W * SCALE}px`,
-                height: `${IMG_H * SCALE}px`,
-                imageRendering: "pixelated",
-                border: "1px solid #ccc",
-                backgroundColor: "#000",
-              }}
-            />
-
-            <div style={{ marginTop: 12, display: "flex", gap: 10 }}>
-              <button
-                onClick={() => setGtState({ x: 0, xDot: 0, theta: 0, thetaDot: 0 })}
-                style={{ padding: "8px 12px", fontSize: 18 }}
-              >
-                Reset GT
-              </button>
-              <button
-                onClick={syncGTToLatent}
-                disabled={disabled}
-                style={{ padding: "8px 12px", fontSize: 18 }}
-              >
-                Sync GT image → latent
-              </button>
+      <div
+        style={{
+          ...styles.grid,
+          gridTemplateColumns: "1fr 1fr", // this page has 2 columns, not 3
+        }}
+      >
+        {/* ===================== GT ===================== */}
+        <Card style={styles.card}>
+          <CardTitleRow style={styles.titleRow}>
+            <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+              <Dot styles={styles} color="#22c55e" />
+              <div>
+                <div style={{ fontWeight: 850, letterSpacing: -0.2 }}>Ground Truth</div>
+                <div style={styles.smallText}>Deterministic renderer driven by the GT state</div>
+              </div>
             </div>
 
-            <div style={{ marginTop: 10, fontSize: 12, color: "#666" }}>
-              GT full state: (x={gtState.x.toFixed(2)}, xDot={gtState.xDot.toFixed(2)}, θ={gtState.theta.toFixed(2)}, θDot={gtState.thetaDot.toFixed(2)})
-            </div>
-          </div>
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 24 }}>
-            <div>
-              <label style={{ display: "block", fontFamily: "monospace" }}>
-                Position = {gtState.x.toFixed(2)}
-              </label>
-              <input
-                type="range"
-                min={-2.4}
-                max={2.4}
-                step={0.01}
-                value={gtState.x}
-                onChange={(e) => {
-                  const x = Number(e.target.value);
-                  // slider change updates GT state (as you wanted)
-                  setGtState((prev) => ({ ...prev, x }));
-                }}
-                style={{ width: 220, accentColor: "#2563eb" }}
-              />
-            </div>
+            <Button variant="danger" styles={styles} onClick={resetGT}>
+              Reset
+            </Button>
+          </CardTitleRow>
 
-            <div>
-              <label style={{ display: "block", fontFamily: "monospace" }}>
-                Angle = {gtState.theta.toFixed(2)}
-              </label>
-              <input
-                type="range"
-                min={-3.14159}
-                max={3.14159}
-                step={0.01}
-                value={gtState.theta}
-                onChange={(e) => {
-                  const theta = Number(e.target.value);
-                  // slider change updates GT state (as you wanted)
-                  setGtState((prev) => ({ ...prev, theta }));
-                }}
-                style={{ width: 220, accentColor: "#2563eb" }}
-              />
-            </div>
-          </div>
-        </div>
+          {/* hidden render canvases */}
+          <canvas ref={gtRenderCanvasRef} width={RENDER_W} height={RENDER_H} style={{ display: "none" }} />
+          <canvas ref={gtSmallCanvasRef} width={IMG_W} height={IMG_H} style={{ display: "none" }} />
 
-        {/* RIGHT: LSTM */}
-        <div style={{ marginLeft: "100px", display: "flex", flexDirection: "column", alignItems: "flex-start", gap: 12 }}>
-
-          <h3 style={{ padding: 16, margin: 0 }}>LSTM Latent Rollout</h3>
-          <p style={{ color: "#666", margin: 0 }}>Decoded image (latent)</p>
-          <canvas ref={latentSmallCanvasRef} width={IMG_W} height={IMG_H} style={{ display: "none" }} />
-          <canvas
-            ref={latentBigCanvasRef}
+          <CanvasFrame
+            canvasRef={gtBigCanvasRef}
             width={IMG_W * SCALE}
             height={IMG_H * SCALE}
-            style={{
-              width: `${IMG_W * SCALE}px`,
-              height: `${IMG_H * SCALE}px`,
-              imageRendering: "pixelated",
-              border: "1px solid #ccc",
-              backgroundColor: "#000",
+            style={styles.canvasFrame}
+          />
+
+          <div style={{ display: "flex", gap: 10, marginTop: 12, flexWrap: "wrap" }}>
+            <Button variant="primary" styles={styles} onClick={syncGTToLatent} disabled={disabled}>
+              Sync GT image → latent
+            </Button>
+
+            <div style={styles.smallText}>
+              GT full state: (x={gtState.x.toFixed(2)}, xDot={gtState.xDot.toFixed(2)}, θ={gtState.theta.toFixed(2)}, θDot=
+              {gtState.thetaDot.toFixed(2)})
+            </div>
+          </div>
+
+
+          <SliderGrid
+            styles={styles}
+            title={null}
+            description={null}
+            columns={2}
+            maxHeight={220}
+            values={[gtState.x, gtState.theta]}
+            labelForIndex={(i) => (i === 0 ? "Position" : "Angle")}
+            formatValue={(v) => Number(v).toFixed(2)}
+            rangeForIndex={(i) =>
+              i === 0
+                ? { min: -2.4, max: 2.4, step: 0.01, width: 240 }
+                : { min: -3.14159, max: 3.14159, step: 0.01, width: 240 }
+            }
+            onChangeIndex={(i, val) => {
+              if (i === 0) setGtState((prev) => ({ ...prev, x: val }));
+              else setGtState((prev) => ({ ...prev, theta: val }));
             }}
           />
 
-          <div style={{ display: "flex", gap: 10, alignItems: "flex-start" }}>
-            <button
-              onClick={() => stepWithAction(0)}
-              disabled={disabled}
-              style={{ padding: "8px 12px", fontSize: 18 }}
-            >
+        </Card>
+
+        {/* ===================== LSTM ===================== */}
+        <Card style={styles.card}>
+          <CardTitleRow style={styles.titleRow}>
+            <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+              <Dot styles={styles} color="#0ea5e9" />
+              <div>
+                <div style={{ fontWeight: 850, letterSpacing: -0.2 }}>LSTM Latent Rollout</div>
+                <div style={styles.smallText}>Latent transition + VAE decoder back to pixels</div>
+              </div>
+            </div>
+
+            <Button variant="danger" styles={styles} onClick={resetLatent}>
+              Reset latent & hidden
+            </Button>
+          </CardTitleRow>
+
+          <canvas ref={latentSmallCanvasRef} width={IMG_W} height={IMG_H} style={{ display: "none" }} />
+          <CanvasFrame
+            canvasRef={latentBigCanvasRef}
+            width={IMG_W * SCALE}
+            height={IMG_H * SCALE}
+            style={styles.canvasFrame}
+          />
+
+          <div style={{ display: "flex", gap: 10, marginTop: 12, flexWrap: "wrap" }}>
+            <Button variant="primary" styles={styles} onClick={() => stepWithAction(0)} disabled={disabled}>
               Action: Left
-            </button>
-            <button
-              onClick={() => stepWithAction(1)}
-              disabled={disabled}
-              style={{ padding: "8px 12px", fontSize: 18 }}
-            >
+            </Button>
+            <Button variant="primary" styles={styles} onClick={() => stepWithAction(1)} disabled={disabled}>
               Action: Right
-            </button>
+            </Button>
           </div>
 
-          <button
-            onClick={() => {
-              setLatent(Array(LATENT_DIM).fill(0));
-              setHData(null);
-              setCData(null);
+          <SliderGrid
+            styles={styles}
+            latent={latent}
+            onChangeLatent={(i, val) => {
+              setLatent((prev) => {
+                const next = [...prev];
+                next[i] = val;
+                return next;
+              });
             }}
-            style={{ padding: "8px 12px", fontSize: 18 }}
-          >
-            Reset latent & hidden
-          </button>
-          <div
-            style={{
-              display: "grid",
-              gridTemplateColumns: "1fr 1fr",
-              columnGap: 18,
-              rowGap: 14,
-              maxHeight: 520,
-              overflowY: "auto",
-              paddingRight: 8,
-            }}
-          >
-            {latent.map((v, i) => (
-              <div key={i}>
-                <label style={{ display: "block", fontFamily: "monospace" }}>
-                  z[{i}] = {v.toFixed(2)}
-                </label>
-                <input
-                  type="range"
-                  min={-3}
-                  max={3}
-                  step={0.05}
-                  value={v}
-                  onChange={(e) => {
-                    const val = Number(e.target.value);
-                    setLatent((prev) => {
-                      const next = [...prev];
-                      next[i] = val;
-                      return next;
-                    });
-                  }}
-                  style={{ width: 220, accentColor: "#2563eb" }}
-                />
-              </div>
-            ))}
-          </div>
-        </div>
+          />
+        </Card>
       </div>
     </div>
   );

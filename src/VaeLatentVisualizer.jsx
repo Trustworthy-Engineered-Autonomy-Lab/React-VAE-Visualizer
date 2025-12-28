@@ -1,34 +1,54 @@
-// src/VaeLatentVisualizer.jsx
-import React, { useEffect, useState, useRef } from "react";
+import React, { useMemo, useRef, useState } from "react";
+
 import { useOrtRuntime } from "./hooks/useOrtRuntime";
 import { useRunQueue } from "./hooks/useRunQueue";
-import { IMG_H, IMG_W } from "./utils/canvas";
 import { useVaeDecoderOnly } from "./hooks/useVaeDecoderOnly";
 import { useVaeDecode } from "./hooks/useVaeDecode";
 
+import { IMG_H, IMG_W } from "./utils/canvas";
+
+import { useUiTheme } from "./components/theme";
+import { Card, CardTitleRow } from "./components/Card";
+import { Button } from "./components/Button";
+import { Dot } from "./components/Pill";
+import { CanvasFrame } from "./components/CanvasFrame";
+import { PageHeader } from "./components/PageHeader";
+import { SliderGrid } from "./components/SliderGrid";
+
 const LATENT_DIM = 16;
-const SCALE = 4; // upscale factor → 96 * 4 = 384
+const SCALE = 4;
 
 const UNUSED_LATENTS = [0, 2, 1, 3, 4, 6, 7, 8, 13, 14];
 
-function VaeLatentVisualizer() {
-  // ORT runtime config (same as PIWM: single-thread, simd, no proxy)
+function sampleStandardNormal() {
+  // Box–Muller
+  const u1 = Math.max(Math.random(), 1e-8);
+  const u2 = Math.random();
+  const r = Math.sqrt(-2.0 * Math.log(u1));
+  const theta = 2.0 * Math.PI * u2;
+  return r * Math.cos(theta);
+}
+
+export default function VaeLatentVisualizer() {
+  // ORT runtime config (same as PIWM)
   useOrtRuntime();
 
-  // Single global queue to serialize ORT runs (prevents ORT wasm overlap issues)
+  // Theme (shared look)
+  const styles = useUiTheme({ imgW: IMG_W, imgH: IMG_H, scale: SCALE });
+
+  // One global queue for ORT runs
   const ortQueueRef = useRunQueue();
 
-  // Load ONLY the decoder session (reusing PIWM loader pattern)
+  // Decoder-only model loader
   const { vaeDec: session, loading, error, setError } = useVaeDecoderOnly();
 
   const [latent, setLatent] = useState(() => Array(LATENT_DIM).fill(0));
 
-  // small offscreen canvas (96x96)
+  // canvases
   const smallCanvasRef = useRef(null);
-  // big visible canvas (384x384)
   const bigCanvasRef = useRef(null);
 
-  // Decode on latent change (reuses your exact pixel pipeline via drawCHWFloatToCanvases)
+  // Decode on latent change
   useVaeDecode({
     vaeDec: session,
     latent,
@@ -38,133 +58,119 @@ function VaeLatentVisualizer() {
     onError: (msg) => setError?.(msg),
   });
 
-  const handleSliderChange = (idx, value) => {
+  const disabled = loading || !session;
+
+  const resetLatent = () => setLatent(Array(LATENT_DIM).fill(0));
+
+  const randomLatent = () => {
+    const arr = Array.from({ length: LATENT_DIM }, () => sampleStandardNormal());
+    setLatent(arr);
+  };
+
+  const onChangeLatent = (i, val) => {
     setLatent((prev) => {
       const next = [...prev];
-      next[idx] = value;
+      next[i] = val;
       return next;
     });
   };
 
-  const resetLatent = () => {
-    setLatent(Array(LATENT_DIM).fill(0));
-  };
-
-  const randomLatent = () => {
-    // sample z ~ N(0,1) via Box–Muller
-    const arr = [];
-    for (let i = 0; i < LATENT_DIM; i++) {
-      const u1 = Math.random();
-      const u2 = Math.random();
-      const r = Math.sqrt(-2.0 * Math.log(Math.max(u1, 1e-8)));
-      const theta = 2.0 * Math.PI * u2;
-      const z = r * Math.cos(theta);
-      arr.push(z);
-    }
-    setLatent(arr);
-  };
-
-  // --- Optional: preserve old "decode on mount" behavior even if latent is all zeros ---
-  // useVaeDecode already runs on first render since latent is initialized.
-  // No additional effect needed.
+  const subtitle = useMemo(
+    () => (
+      <>
+        Probe the decoder by manipulating <span style={styles.kbd}>z</span> directly. Dimensions marked as{" "}
+        <span style={styles.kbd}>unused</span> are de-emphasized.
+      </>
+    ),
+    [styles.kbd]
+  );
 
   return (
-    <div style={{ justifyContent: "center", padding: 16, fontFamily: "sans-serif" }}>
-      {loading && <p>Loading ONNX model…</p>}
-      {error && (
-        <p style={{ color: "red", whiteSpace: "pre-wrap" }}>
-          Error: {error}
-        </p>
+    <div style={styles.page}>
+      <PageHeader
+        styles={styles}
+        title="VAE Latent Visualizer"
+        subtitle={subtitle}
+        callout={
+          <>
+            <b>Flow:</b> drag sliders → decoder renders instantly. Use <b>Random latent</b> to sample z ~ N(0,1).
+          </>
+        }
+      />
+
+      {loading && (
+        <Card style={{ ...styles.card, marginBottom: 12 }}>
+          <div style={{ fontWeight: 800, marginBottom: 6 }}>Loading ONNX model…</div>
+          <div style={styles.smallText}>
+            If this takes unusually long, check model paths and whether the browser is blocking WASM assets.
+          </div>
+        </Card>
       )}
 
-      <div style={{ display: "flex", gap: 24, alignItems: "flex-start" }}>
-        {/* Sliders */}
-        <div
-          style={{
-            display: "grid",
-            gridTemplateColumns: "1fr 1fr",
-            gap: 52,
-            maxHeight: "100%",
-            maxWidth: "100%",
-            overflowY: "auto",
-          }}
-        >
-          {latent.map((value, i) => {
-            const isUnused = UNUSED_LATENTS.includes(i);
+      {error && <div style={styles.err}>Error: {error}</div>}
 
-            return (
-              <div key={i}>
-                <label
-                  style={{
-                    display: "block",
-                    fontSize: 20,
-                    marginBottom: 4,
-                    fontFamily: "monospace",
-                    color: isUnused ? "#888" : "#000",
-                  }}
-                >
-                  z[{i}] = {value.toFixed(2)}
-                </label>
-                <input
-                  type="range"
-                  min={-3}
-                  max={3}
-                  step={0.05}
-                  value={value}
-                  onChange={(e) => handleSliderChange(i, Number(e.target.value))}
-                  style={{
-                    width: 200,
-                    accentColor: isUnused ? "#888888" : "#2563eb",
-                  }}
-                />
+      <div style={{ ...styles.grid, gridTemplateColumns: "1fr 1fr" }}>
+        {/* ===================== Controls ===================== */}
+        <Card style={styles.card}>
+          <CardTitleRow style={styles.titleRow}>
+            <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+              <Dot styles={styles} color="#0ea5e9" />
+              <div>
+                <div style={{ fontWeight: 850, letterSpacing: -0.2 }}>Latent controls</div>
+                <div style={styles.smallText}>Edit z[i] and observe decoded pixels</div>
               </div>
-            );
-          })}
-        </div>
+            </div>
+          </CardTitleRow>
 
-        {/* Canvases */}
-        <div>
-          {/* offscreen small canvas (96x96) */}
-          <p style={{ fontSize: 25, color: "#666", marginBottom: 8 }}>
-            Decoded image
-          </p>
+          <div style={{ display: "flex", gap: 10, marginTop: 12, flexWrap: "wrap" }}>
+            <Button styles={styles} variant="primary" onClick={randomLatent} disabled={disabled}>
+              Random latent
+            </Button>
+            <Button variant="danger" styles={styles} onClick={resetLatent} disabled={disabled}>
+              Reset latent
+            </Button>
+          </div>
 
-          <canvas
-            ref={smallCanvasRef}
-            width={IMG_W}
-            height={IMG_H}
-            style={{ display: "none" }}
+          <SliderGrid
+            styles={styles}
+            latent={latent}
+            onChangeLatent={onChangeLatent}
+            unusedIndices={UNUSED_LATENTS}
+            description={
+              <>
+                “Unused” dims the control and changes the slider accent to gray (still editable).
+              </>
+            }
           />
+        </Card>
 
-          <canvas
-            ref={bigCanvasRef}
+        {/* ===================== Output ===================== */}
+        <Card style={styles.card}>
+          <CardTitleRow style={styles.titleRow}>
+            <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+              <Dot styles={styles} color="#22c55e" />
+              <div>
+                <div style={{ fontWeight: 850, letterSpacing: -0.2 }}>Decoded image</div>
+                <div style={styles.smallText}>Decoder output rendered at 96×96 then upscaled</div>
+              </div>
+            </div>
+          </CardTitleRow>
+
+          {/* offscreen small canvas */}
+          <canvas ref={smallCanvasRef} width={IMG_W} height={IMG_H} style={{ display: "none" }} />
+
+          {/* visible upscaled canvas */}
+          <CanvasFrame
+            canvasRef={bigCanvasRef}
             width={IMG_W * SCALE}
             height={IMG_H * SCALE}
-            style={{
-              width: `${IMG_W * SCALE}px`,
-              height: `${IMG_H * SCALE}px`,
-              imageRendering: "pixelated",
-              border: "1px solid #ccc",
-              backgroundColor: "#000",
-            }}
+            style={styles.canvasFrame}
           />
 
-          <div style={{ marginTop: 20 }}>
-            <button onClick={resetLatent} style={{ padding: "8px 16px", fontSize: 25 }}>
-              Reset Latent
-            </button>
-            <button
-              onClick={randomLatent}
-              style={{ padding: "8px 16px", fontSize: 25, marginLeft: 17 }}
-            >
-              Random latent
-            </button>
-          </div>
-        </div>
+
+        </Card>
       </div>
     </div>
   );
 }
-
-export default VaeLatentVisualizer;
 
