@@ -3,7 +3,7 @@
 import * as ort from "onnxruntime-web";
 import { canvasToCHWFloat, IMG_H, IMG_W } from "../utils/canvas";
 import { transitionModel, learnedTransitionModel } from "../utils/physics";
-
+import { useEffect } from "react";
 export function usePiwmControls({
   vaeEnc,
   piwmEnc,
@@ -98,6 +98,10 @@ export function usePiwmControls({
       onError?.(String(e));
     }
   };
+
+  useEffect(() => {
+    syncGT();
+  }, [vaeEnc, piwmEnc]);
 
   return { syncGT, stepWithAction };
 }

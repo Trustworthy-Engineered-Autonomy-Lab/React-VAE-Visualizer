@@ -147,6 +147,7 @@ export default function PIWMVisualizer() {
   };
   const resetPiwm = () => setPiwmState({ x: 0, xDot: 0, theta: 0, thetaDot: 0 });
 
+
   const disabled = loading || !vaeEnc || !vaeDec || !lstm || !piwmEnc || !piwmDec;
 
   const subtitle = useMemo(

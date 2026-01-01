@@ -159,14 +159,6 @@ export default function Home() {
         span: "span 6",
       },
       {
-        to: "/latent",
-        title: "VAE Latent",
-        iconBg: "linear-gradient(180deg, rgba(59,130,246,0.14), rgba(59,130,246,0.06))",
-        iconBorder: "rgba(59,130,246,0.26)",
-        desc: "Explore latent directions and how the decoder maps z → observation frames.",
-        span: "span 4",
-      },
-      {
         to: "/rollout",
         title: "LSTM Rollout",
         iconBg: "linear-gradient(180deg, rgba(236,72,153,0.14), rgba(236,72,153,0.06))",
@@ -174,6 +166,15 @@ export default function Home() {
         desc: "Latent transition model (z, action, hidden) → z′. Watch drift over horizons.",
         span: "span 4",
       },
+      {
+        to: "/latent",
+        title: "VAE Latent",
+        iconBg: "linear-gradient(180deg, rgba(59,130,246,0.14), rgba(59,130,246,0.06))",
+        iconBorder: "rgba(59,130,246,0.26)",
+        desc: "Explore latent directions and how the decoder maps z → observation frames.",
+        span: "span 4",
+      },
+
       {
         to: "/semi",
         title: "Semi-Interpretable",
@@ -198,7 +199,7 @@ export default function Home() {
     <div style={S.page}>
       <div style={S.container}>
         <div style={S.hero}>
-          <h1 style={S.h1}>Research Visualizers</h1>
+          <h1 style={S.h1}>World Model Visualizers</h1>
           <p style={S.sub}>
             Pick a module to explore. For clean demos: start with <span style={S.kbd}>User Guide</span>, then run{" "}
             <span style={S.kbd}>PIWM</span> with the recommended <b>Sync → Actions → Drift</b> flow.

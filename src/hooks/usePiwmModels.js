@@ -42,6 +42,7 @@ export function usePiwmModels() {
     }
 
     load();
+
     return () => {
       cancelled = true;
     };
