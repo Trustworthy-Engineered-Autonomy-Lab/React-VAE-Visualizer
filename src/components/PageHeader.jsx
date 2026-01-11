@@ -9,13 +9,14 @@ export function PageHeader({
   callout,
 }) {
   return (
-    <div style={styles.header}>
+    <div style={{ marginBottom: 20 }}>
       <div
         style={{
           display: "flex",
           alignItems: "baseline",
           justifyContent: "space-between",
           gap: 12,
+          marginTop: 20,
           flexWrap: "wrap",
         }}
       >
